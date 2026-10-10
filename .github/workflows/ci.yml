@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: 0
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: dfm-mcp
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: dfm-mcp/go.mod
+          cache-dependency-path: dfm-mcp/go.sum
+
+      - name: Build
+        working-directory: dfm-mcp
+        run: go build ./...
+
+      - name: Test
+        working-directory: dfm-mcp
+        run: go test ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: dfm-mcp
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: dfm-mcp/go.mod
+          cache-dependency-path: dfm-mcp/go.sum
+      - name: Lint
+        working-directory: dfm-mcp
+        run: make lint

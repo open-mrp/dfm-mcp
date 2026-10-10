@@ -1,0 +1,27 @@
+# Builds the local MCP server for every platform on each release and attaches the archives to the GitHub
+# release.
+version: 2
+project_name: dfm-mcp
+builds:
+  - id: dfm-mcp
+    main: ./cmd/dfm-mcp
+    binary: dfm-mcp
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/open-mrp/dfm-mcp/internal/mcpserver.Version={{.Version}}
+archives:
+  - id: dfm-mcp
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+checksum:
+  name_template: checksums.txt
+release:
+  # release-please makes the release; goreleaser only attaches the archives.
+  mode: keep-existing
+changelog:
+  disable: true
