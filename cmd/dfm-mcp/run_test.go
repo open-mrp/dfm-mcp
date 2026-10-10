@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,5 +59,18 @@ func TestMintAttemptIsKeptUntilSaved(t *testing.T) {
 	}
 	if loadKey(path, "https://dfm.example") != "dfm_sk_x" {
 		t.Error("starting a new attempt lost the saved key")
+	}
+}
+
+// Asking for help prints the usage and succeeds.
+func TestHelpIsNotAnError(t *testing.T) {
+	var stderr strings.Builder
+	dir := t.TempDir()
+	env := map[string]string{"HOME": dir, "XDG_CONFIG_HOME": dir, "XDG_STATE_HOME": dir}
+	if err := Run(context.Background(), []string{"--help"}, func(k string) string { return env[k] }, strings.NewReader(""), io.Discard, &stderr); err != nil {
+		t.Fatalf("--help returned %v", err)
+	}
+	if !strings.Contains(stderr.String(), "dfm-mcp telemetry") {
+		t.Errorf("usage not printed: %q", stderr.String())
 	}
 }

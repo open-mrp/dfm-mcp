@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -44,6 +45,10 @@ func Run(ctx context.Context, args []string, getenv func(string) string, _ io.Re
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	apiURL := fs.String("api-url", cmp.Or(getenv("DFM_API_URL"), defaultAPIURL), "the DFM API that records checks and takes feedback")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			// The usage was printed; asking for it is not a failure.
+			return nil
+		}
 		return err
 	}
 	paths := newPaths(getenv)
