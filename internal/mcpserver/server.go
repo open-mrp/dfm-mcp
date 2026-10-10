@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime/debug"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -25,8 +26,18 @@ import (
 	"github.com/open-mrp/dfm-mcp/internal/resource"
 )
 
-// Version is the server's version, stamped at build time.
-var Version = "dev"
+// Version is this build's version: stamped into release binaries by the linker, and otherwise taken from the module version Go recorded, so a `go install ...@v1.2.3` reports 1.2.3 too. It names the server to clients and goes with telemetry and the User-Agent.
+var Version = ""
+
+func init() {
+	if Version != "" {
+		return
+	}
+	Version = "dev"
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		Version = strings.TrimPrefix(info.Main.Version, "v")
+	}
+}
 
 // Options configures the server.
 type Options struct {
