@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/open-mrp/dfm-mcp/compare/v1.1.0...v1.1.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* write the Homebrew cask without deprecated stanzas ([#6](https://github.com/open-mrp/dfm-mcp/issues/6)) ([77dd8b8](https://github.com/open-mrp/dfm-mcp/commit/77dd8b8eecbc6e1847acff83af9f06e46f1ed710))
+
 ## [1.1.0](https://github.com/open-mrp/dfm-mcp/compare/v1.0.1...v1.1.0) (2026-10-11)
 
 
