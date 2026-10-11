@@ -34,24 +34,24 @@ homebrew_casks:
     description: The DFM check engine as a local MCP server
     license: Apache-2.0
     commit_msg_template: "dfm-mcp {{ .Tag }}"
-    # Homebrew prints these after the install: how to add the server to each client. GoReleaser writes the caveats into the cask as Ruby strings, one per line, and Homebrew shows only the last, so this is folded into one line: each \n is a Ruby newline, and quotes are escaped for Ruby.
-    caveats: >-
+    # Homebrew prints these after the install: how to add the server to each client.
+    caveats: |
       Add dfm-mcp to your MCP client:
-      \n
-      \n  Claude Code   claude mcp add --scope user dfm -- dfm-mcp
-      \n  Codex         codex mcp add dfm -- dfm-mcp
-      \n  Cursor        add to ~/.cursor/mcp.json:
-      \n                  { \"mcpServers\": { \"dfm\": { \"command\": \"dfm-mcp\" } } }
-      \n  opencode      add to ~/.config/opencode/opencode.json:
-      \n                  { \"mcp\": { \"dfm\": { \"type\": \"local\", \"command\": [\"dfm-mcp\"] } } }
+
+        Claude Code   claude mcp add --scope user dfm -- dfm-mcp
+        Codex         codex mcp add dfm -- dfm-mcp
+        Cursor        add to ~/.cursor/mcp.json:
+                        { "mcpServers": { "dfm": { "command": "dfm-mcp" } } }
+        opencode      add to ~/.config/opencode/opencode.json:
+                        { "mcp": { "dfm": { "type": "local", "command": ["dfm-mcp"] } } }
     skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_DEPLOY_KEY" }}false{{ else }}true{{ end }}'
-    # The binary is not notarized, so Gatekeeper would refuse to run it once Homebrew has quarantined the download.
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dfm-mcp"]
-          end
+    # The binary is not notarized, so Gatekeeper would refuse to run it once Homebrew has quarantined the download. Homebrew deprecated the postflight block GoReleaser's hooks write in favour of declarative steps, so they go in as a custom block.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "dfm-mcp"], chdir: "."
+        end
+      end
 release:
   # release-please makes the release; goreleaser only attaches the archives.
   mode: keep-existing
