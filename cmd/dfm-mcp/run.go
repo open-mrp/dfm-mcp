@@ -84,7 +84,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, _ io.Re
 		defer close(flushed)
 		counters.Run(flushCtx, api)
 	}()
-	err = mcpserver.New(mcpserver.Options{Local: local}).Run(ctx, &mcp.StdioTransport{})
+	err = mcpserver.New(mcpserver.Options{Local: local, Logger: logger, CrashDir: filepath.Join(paths.state, "crashes")}).Run(ctx, &mcp.StdioTransport{})
 	stopFlush()
 	<-flushed
 	return err
