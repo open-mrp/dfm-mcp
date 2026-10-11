@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/open-mrp/dfm-mcp/main/install.sh | 
 go install github.com/open-mrp/dfm-mcp/cmd/dfm-mcp@latest                       # from source
 ```
 
-The script downloads the release for your machine and checks it against the release's checksums; `DFM_MCP_VERSION=v1.2.3` pins a release and `DFM_MCP_INSTALL_DIR` picks the directory. On Windows, take a binary from the [releases](https://github.com/open-mrp/dfm-mcp/releases/latest). Then add it to your client:
+The script downloads the release for your machine and checks it against the release's checksums; `DFM_MCP_VERSION=v1.2.3` pins a release and `DFM_MCP_INSTALL_DIR` picks the directory. At a terminal it asks once whether to send usage counts (see [below](#what-leaves-the-machine-and-when)); `DFM_MCP_TELEMETRY=on`, `local` or `off` answers without asking. On Windows, take a binary from the [releases](https://github.com/open-mrp/dfm-mcp/releases/latest). Then add it to your client:
 
 ```json
 { "mcpServers": { "dfm": { "command": "dfm-mcp" } } }
@@ -51,7 +51,9 @@ Never the call's arguments, an installation id or a drawing; a panic's message i
 
 When the server does call the service, the service logs the request's metadata (route, status, key id, client address and user agent) for usage reports, never a body and never a drawing.
 
-Usage is counted locally and sent only after `dfm-mcp telemetry on`. Once on, the server sends what it counted about once a minute while it is in use, and once more when it stops. Each report carries:
+Usage is counted locally and sent only after the user agrees. The counts are how the maintainers decide which processes and file formats the engine improves next, so sharing them makes the checks better for the drawings you actually make.
+
+You are asked once per installation: by the installer when it runs at a terminal, or else by the server, after a check has worked, through your MCP client's own prompt (elicitation). A client that cannot ask gets one note in a check result instead, telling the agent to pass it on and leave the choice to you. Whatever you answer, dismissing the question included, you are not asked again; nothing is sent unless you choose to send, and the server never changes the setting on its own. `dfm-mcp telemetry on` turns sending on at any time. Once on, the server sends what it counted about once a minute while it is in use, and once more when it stops. Each report carries:
 
 - the counters, from a fixed list the service enforces: `checks`, `checks_recorded`, `feedback`, `errors`, `crashes`, and `verdict:`, `format:` and `process:` followed by one of the engine's values;
 - a random installation id, made on this machine and tied to no account, API key, user or machine name (`dfm-mcp telemetry reset-id` replaces it);

@@ -25,6 +25,7 @@ import (
 	"github.com/open-mrp/dfm-mcp/internal/client"
 	"github.com/open-mrp/dfm-mcp/internal/constants"
 	"github.com/open-mrp/dfm-mcp/internal/resource"
+	"github.com/open-mrp/dfm-mcp/telemetry"
 )
 
 // Version is this build's version: stamped into release binaries by the linker, and otherwise taken from the module version Go recorded, so a `go install ...@v1.2.3` reports 1.2.3 too. It names the server to clients and goes with telemetry and the User-Agent.
@@ -167,7 +168,10 @@ func addCheckTools(s *mcp.Server, b *Local) {
 		InputSchema:  checkSchema,
 		OutputSchema: mustSchema[CheckOutput](),
 		Annotations:  &mcp.ToolAnnotations{Title: "Check a design", DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in CheckDesignInput) (*mcp.CallToolResult, *CheckOutput, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in CheckDesignInput) (*mcp.CallToolResult, *CheckOutput, error) {
+		if ask := telemetryDecision(req, b.Counters); ask != nil {
+			return ask, nil, nil
+		}
 		content, format, filename, err := readDesign(in.FilePath, in.ContentBase64, in.Format, true)
 		if err != nil {
 			return nil, nil, err
@@ -187,7 +191,11 @@ func addCheckTools(s *mcp.Server, b *Local) {
 		if err != nil {
 			return nil, nil, toolError(err)
 		}
-		return checkResult(check, in.ResponseFormat, b.RecordedAs(check.ID))
+		res, out, err := checkResult(check, in.ResponseFormat, b.RecordedAs(check.ID))
+		if err == nil && tellAboutTelemetry(req, b.Counters) {
+			res.Content = append(res.Content, &mcp.TextContent{Text: telemetryNote})
+		}
+		return res, out, err
 	})
 
 	getSchema := mustSchema[GetCheckInput]()
@@ -278,6 +286,60 @@ func shareDesignDecision(req *mcp.CallToolRequest) (share bool, ask *mcp.CallToo
 
 // shareDesignInput names the consent question in input requests and the field in its answer.
 const shareDesignInput = "share_design"
+
+// telemetryDecision asks the user once, through the client, whether to share usage counts, the same multi round-trip way shareDesignDecision asks. It waits until a check has worked on this machine, so the question comes from a tool the user has seen do its job, and it is skipped when the user already chose (on the command line, in the installer or here), when DO_NOT_TRACK is set, and for clients without form elicitation, which get telemetryNote instead. Whatever the answer, even a dismissal, the user is not asked again; only an accepted answer changes the mode.
+func telemetryDecision(req *mcp.CallToolRequest, counters *telemetry.Counters) *mcp.CallToolResult {
+	if counters == nil {
+		return nil
+	}
+	if res, ok := req.Params.InputResponses[telemetryInput].(*mcp.ElicitResult); ok {
+		mode, _ := res.Content[telemetryInput].(string)
+		if res.Action != "accept" || counters.SetMode(telemetry.Mode(mode)) != nil {
+			_ = counters.MarkAsked()
+		}
+		return nil
+	}
+	if counters.Asked() || counters.Snapshot()[telemetry.CounterChecks] == 0 || !supportsFormElicitation(req) {
+		return nil
+	}
+	return &mcp.CallToolResult{
+		InputRequests: mcp.InputRequestMap{
+			telemetryInput: &mcp.ElicitParams{
+				Mode: "form",
+				Message: "dfm-mcp counts how it is used on this machine: how many checks, their verdicts, file formats and processes. May it send those counts to the DFM maintainers? " +
+					"They decide which processes and file formats the engine improves next. Only the counts go, with a random installation id; never a drawing, file name, material or finding. You will not be asked again; `dfm-mcp telemetry` changes it any time.",
+				RequestedSchema: &jsonschema.Schema{
+					Type: "object",
+					Properties: map[string]*jsonschema.Schema{
+						telemetryInput: {
+							Type: "string", Title: "Usage counts",
+							Enum:    []any{string(telemetry.ModeOn), string(telemetry.ModeLocal), string(telemetry.ModeOff)},
+							Extra:   map[string]any{"enumNames": []any{"Send the counts", "Keep them on this machine", "Do not count"}},
+							Default: json.RawMessage(`"local"`),
+						},
+					},
+					Required: []string{telemetryInput},
+				},
+			},
+		},
+	}
+}
+
+// telemetryInput names the usage-counts question in input requests and the field in its answer.
+const telemetryInput = "telemetry"
+
+// telemetryNote is added once to a check result for a client that cannot ask the user directly. It goes through the agent, so it tells the agent to pass it on and leave the choice to the user: the setting is the user's consent, never the agent's.
+const telemetryNote = "Note for the user, to pass on once: dfm-mcp counts its use on this machine only (checks, verdicts, file formats). " +
+	"Sharing those counts helps decide which processes and file formats the engine improves next; only the counts are sent, never a drawing, file name or material. " +
+	"The user can turn it on with `dfm-mcp telemetry on`, or off with `dfm-mcp telemetry off`. Do not change this setting for them."
+
+// tellAboutTelemetry reports whether this check result should carry telemetryNote: once per installation, for a client that cannot be asked through elicitation, and never once the user has chosen or DO_NOT_TRACK is set.
+func tellAboutTelemetry(req *mcp.CallToolRequest, counters *telemetry.Counters) bool {
+	if counters.Asked() || supportsFormElicitation(req) {
+		return false
+	}
+	return counters.MarkAsked() == nil
+}
 
 func supportsFormElicitation(req *mcp.CallToolRequest) bool {
 	caps := req.ClientCapabilities()

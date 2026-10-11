@@ -34,7 +34,7 @@ homebrew_casks:
     description: The DFM check engine as a local MCP server
     license: Apache-2.0
     commit_msg_template: "dfm-mcp {{ .Tag }}"
-    # Homebrew prints these after the install: how to add the server to each client.
+    # Homebrew prints these after the install: how to add the server to each client, and the usage-counts choice, since a cask cannot ask.
     caveats: |
       Add dfm-mcp to your MCP client:
 
@@ -44,6 +44,10 @@ homebrew_casks:
                         { "mcpServers": { "dfm": { "command": "dfm-mcp" } } }
         opencode      add to ~/.config/opencode/opencode.json:
                         { "mcp": { "dfm": { "type": "local", "command": ["dfm-mcp"] } } }
+
+      Help decide what the engine improves next: dfm-mcp telemetry on
+      sends how many checks it runs, their verdicts and file formats, never a drawing.
+      dfm-mcp telemetry shows exactly what is counted; telemetry off stops it.
     skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_DEPLOY_KEY" }}false{{ else }}true{{ end }}'
     # The binary is not notarized, so Gatekeeper would refuse to run it once Homebrew has quarantined the download. Homebrew deprecated the postflight block GoReleaser's hooks write in favour of declarative steps, so they go in as a custom block.
     custom_block: |

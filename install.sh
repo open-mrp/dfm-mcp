@@ -3,7 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/open-mrp/dfm-mcp/main/install.sh | sh
 #
-# DFM_MCP_VERSION pins a release (v1.2.3); DFM_MCP_INSTALL_DIR picks the directory, by default ~/.local/bin.
+# DFM_MCP_VERSION pins a release (v1.2.3); DFM_MCP_INSTALL_DIR picks the directory, by default ~/.local/bin; DFM_MCP_TELEMETRY (on, local or off) answers the usage-counts question without a terminal.
 set -eu
 
 repo="open-mrp/dfm-mcp"
@@ -81,6 +81,34 @@ case ":$PATH:" in
 	*":$install_dir:"*) ;;
 	*) printf '\n%s is not on your PATH. Add it with:\n\n  export PATH="%s:$PATH"\n' "$install_dir" "$install_dir" ;;
 esac
+
+# Usage counts are the user's choice, made once: asked here at a terminal (stdin is the script when piped, so the answer is read from /dev/tty), and recorded with `dfm-mcp telemetry` so the server does not ask again. An earlier choice and DO_NOT_TRACK are respected; Enter keeps the counts on the machine.
+telemetry_choice="${DFM_MCP_TELEMETRY:-}"
+if [ -z "$telemetry_choice" ] && { [ -z "${DO_NOT_TRACK:-}" ] || [ "${DO_NOT_TRACK}" = 0 ]; } &&
+	[ ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/dfm/telemetry" ] && [ -t 1 ] && (: </dev/tty) 2>/dev/null; then
+	cat <<EOF
+
+${bold}Help decide what the engine improves next?${reset}
+dfm-mcp can send how many checks it runs, their verdicts and the file formats,
+about once a minute while in use, with a random installation id.
+Never a drawing, file name, material or finding. ${dim}dfm-mcp telemetry off${reset} stops it.
+
+EOF
+	printf 'Send usage counts? [y/N] '
+	answer=""
+	read -r answer </dev/tty || true
+	case "$answer" in
+		[yY]*) telemetry_choice=on ;;
+		*) telemetry_choice=local ;;
+	esac
+fi
+if [ -n "$telemetry_choice" ]; then
+	if "$install_dir/dfm-mcp" telemetry "$telemetry_choice" >/dev/null 2>&1; then
+		ok "Usage counts: $telemetry_choice"
+	else
+		printf 'Could not set usage counts to "%s"; run dfm-mcp telemetry on, local or off.\n' "$telemetry_choice" >&2
+	fi
+fi
 
 cat <<EOF
 

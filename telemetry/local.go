@@ -92,6 +92,7 @@ type Counters struct {
 	dir       string
 	modeFile  string
 	idFile    string
+	askedFile string
 	program   string
 	version   string
 	engine    string
@@ -105,7 +106,7 @@ type Counters struct {
 // Open loads the counters under stateDir, reading the mode and the installation id from configDir. DO_NOT_TRACK in the environment turns everything off, whatever the mode file says.
 func Open(stateDir, configDir, program, version, engineVersion string, getenv func(string) string) (*Counters, error) {
 	c := &Counters{
-		dir: filepath.Join(stateDir, "telemetry"), modeFile: filepath.Join(configDir, "telemetry"), idFile: filepath.Join(configDir, "telemetry-id"),
+		dir: filepath.Join(stateDir, "telemetry"), modeFile: filepath.Join(configDir, "telemetry"), idFile: filepath.Join(configDir, "telemetry-id"), askedFile: filepath.Join(configDir, "telemetry-asked"),
 		program: program, version: version, engine: engineVersion, now: time.Now,
 	}
 	if v := strings.TrimSpace(getenv("DO_NOT_TRACK")); v != "" && v != "0" && !strings.EqualFold(v, "false") {
@@ -157,6 +158,27 @@ func (c *Counters) SetMode(m Mode) error {
 	defer c.mu.Unlock()
 	c.st.Pending, c.st.Inflight = nil, nil
 	return c.save()
+}
+
+// Asked reports whether the user has made a choice or been told how to make one, so the server raises telemetry at most once per installation. A mode set from the command line or the installer counts as a choice; DO_NOT_TRACK counts as one too.
+func (c *Counters) Asked() bool {
+	if c == nil || c.disabled {
+		return true
+	}
+	for _, f := range []string{c.modeFile, c.askedFile} {
+		if _, err := os.Stat(f); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkAsked records that the user was asked or told and left the mode as it was, so they are not asked again.
+func (c *Counters) MarkAsked() error {
+	if err := os.MkdirAll(filepath.Dir(c.askedFile), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(c.askedFile, []byte(c.now().UTC().Format(time.RFC3339)+"\n"), 0o600)
 }
 
 // InstallationID is this installation's random id, made the first time it is needed. It is 32 hex characters from the system's random source, unrelated to any account, API key, user or machine name.
@@ -435,6 +457,9 @@ func (c *Counters) Status() string {
 	sort.Strings(names)
 	for _, name := range names {
 		fmt.Fprintf(&b, "  %-28s %d\n", name, week[name])
+	}
+	if mode == ModeLocal && len(week) > 0 {
+		b.WriteString("these counts stay on this machine; `dfm-mcp telemetry on` shares them (only the counts above, never a drawing) and helps decide which processes and file formats the engine improves next\n")
 	}
 	if waiting > 0 {
 		fmt.Fprintf(&b, "%d counts waiting to be sent\n", waiting)

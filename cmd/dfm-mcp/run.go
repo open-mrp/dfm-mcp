@@ -38,7 +38,7 @@ const usage = `dfm-mcp: the DFM check engine as an MCP server, over stdio, on th
   dfm-mcp crash-reports            show whether crash reports are sent
   dfm-mcp crash-reports on|off     send a report to the maintainers when dfm-mcp crashes | keep crashes on this machine only (default)
 
-Drawings never leave this machine unless the user shares one with a feedback report. Telemetry sends only the counts listed in the README, and only with "telemetry on"; crash reports carry the version, where it failed, the panic and the stack, and are sent only with "crash-reports on". DO_NOT_TRACK=1 turns both off.
+Drawings never leave this machine unless the user shares one with a feedback report. Telemetry sends only the counts listed in the README, and only with "telemetry on"; they decide which processes and file formats the engine improves next; crash reports carry the version, where it failed, the panic and the stack, and are sent only with "crash-reports on". DO_NOT_TRACK=1 turns both off.
 `
 
 // Run is the entry point, separate from main so a test can drive it.
