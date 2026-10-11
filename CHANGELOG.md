@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/open-mrp/dfm-mcp/compare/v1.2.0...v1.3.0) (2026-10-11)
+
+
+### Features
+
+* ask once whether to send usage counts ([#12](https://github.com/open-mrp/dfm-mcp/issues/12)) ([9436981](https://github.com/open-mrp/dfm-mcp/commit/94369813e57dfc5c126fabd0c363fe978b512b68))
+
 ## [1.2.0](https://github.com/open-mrp/dfm-mcp/compare/v1.1.1...v1.2.0) (2026-10-11)
 
 
