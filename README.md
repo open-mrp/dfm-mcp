@@ -40,6 +40,8 @@ The catalogs are also resources (`dfm://finding-codes`, `dfm://capability-preset
 
 Results stay in `~/.local/state/dfm/checks`. Nothing reaches the service until the user records a check or reports a wrong result; a report records the check first and files the feedback against it. The API key for that is minted the first time it is needed and saved to `~/.config/dfm/credentials.json`, or taken from `DFM_API_KEY`. `DFM_API_URL` points the server at another deployment.
 
+If the server crashes on a request, it answers that request with an error instead of stopping, and keeps a report in `~/.local/state/dfm/crashes`: the version, the tool, the panic and the stack, never the call's arguments. The error carries a link to a GitHub issue prefilled with that report; it is filed only if the user opens the link and submits it. The crash is counted under `errors`.
+
 When the server does call the service, the service logs the request's metadata (route, status, key id, client address and user agent) for usage reports, never a body and never a drawing.
 
 Usage is counted locally and sent only after `dfm-mcp telemetry on`. Once on, the server sends what it counted about once a minute while it is in use, and once more when it stops. Each report carries:

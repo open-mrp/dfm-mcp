@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,6 +45,10 @@ func init() {
 type Options struct {
 	// Local (required) is the engine, the store and the API behind the tools.
 	Local *Local
+	// Logger (optional; default: discards) gets the stack of a recovered crash.
+	Logger *slog.Logger
+	// CrashDir (optional; default: none) keeps a report of each recovered crash for the user to read or file.
+	CrashDir string
 }
 
 const instructions = `DFM (design for manufacturing) checks for sheet-metal drawings: DXF, SVG and STEP. The engine answers "can this part be made on this machine from this stock", listing every problem by part with where it is and how to fix it.
@@ -73,6 +78,11 @@ func New(opts Options) *mcp.Server {
 	addFeedbackTool(s, opts.Local)
 	addResources(s, opts.Local)
 	addPrompts(s)
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	s.AddReceivingMiddleware(recoverPanics(opts.Local, logger, opts.CrashDir))
 	return s
 }
 
