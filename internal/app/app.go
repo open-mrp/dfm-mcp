@@ -1,4 +1,4 @@
-// Package app registers what the kit needs to know for the engine's errors to carry the API's codes. Every binary and test calls Register once.
+// Package app registers what the kit needs to know for the engine's errors to carry the API's codes. mcpserver.New calls Register, so every server, in the binary or a test, has the codes.
 package app
 
 import (

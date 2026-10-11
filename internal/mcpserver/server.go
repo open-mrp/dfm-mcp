@@ -21,6 +21,7 @@ import (
 	dfmconstants "github.com/open-mrp/dfm/constants"
 	dfmresource "github.com/open-mrp/dfm/resource"
 
+	"github.com/open-mrp/dfm-mcp/internal/app"
 	"github.com/open-mrp/dfm-mcp/internal/client"
 	"github.com/open-mrp/dfm-mcp/internal/constants"
 	"github.com/open-mrp/dfm-mcp/internal/resource"
@@ -55,8 +56,9 @@ Drawings are often proprietary. Nothing is sent anywhere unless asked: set recor
 
 When a result looks wrong, use dfm_report_feedback with what you know; people review reports and fix the engine.`
 
-// New builds the MCP server for one session.
+// New builds the MCP server for one session. It registers the API's error codes first: the engine's errors are turned into the kit's by code, and an unregistered code panics and takes the server down.
 func New(opts Options) *mcp.Server {
+	app.Register()
 	s := mcp.NewServer(&mcp.Implementation{Name: "dfm", Title: "DFM check engine", Version: Version}, &mcp.ServerOptions{
 		Instructions: instructions,
 		// Usage counts carry the client the agent runs in (claude-code, cursor, ...), as it named itself; nothing else about it.
