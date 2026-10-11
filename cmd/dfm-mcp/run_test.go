@@ -74,3 +74,29 @@ func TestHelpIsNotAnError(t *testing.T) {
 		t.Errorf("usage not printed: %q", stderr.String())
 	}
 }
+
+func TestCrashReportsCommand(t *testing.T) {
+	env := map[string]string{"XDG_CONFIG_HOME": t.TempDir(), "XDG_STATE_HOME": t.TempDir(), "HOME": t.TempDir()}
+	getenv := func(k string) string { return env[k] }
+	run := func(args ...string) (string, error) {
+		var out bytes.Buffer
+		err := Run(context.Background(), args, getenv, nil, &out, &out)
+		return out.String(), err
+	}
+	if s, err := run("crash-reports"); err != nil || !strings.HasPrefix(s, "crash reports: off") {
+		t.Errorf("default: %q %v", s, err)
+	}
+	if s, err := run("crash-reports", "on"); err != nil || !strings.HasPrefix(s, "crash reports: on") {
+		t.Errorf("on: %q %v", s, err)
+	}
+	if s, _ := run("crash-reports"); !strings.HasPrefix(s, "crash reports: on") {
+		t.Errorf("after on: %q", s)
+	}
+	env["DO_NOT_TRACK"] = "1"
+	if s, _ := run("crash-reports"); !strings.Contains(s, "DO_NOT_TRACK") {
+		t.Errorf("do not track: %q", s)
+	}
+	if _, err := run("crash-reports", "sometimes"); err == nil {
+		t.Error("an unknown argument must fail")
+	}
+}

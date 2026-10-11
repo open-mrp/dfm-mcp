@@ -13,6 +13,7 @@ import (
 	dfmconstants "github.com/open-mrp/dfm/constants"
 
 	"github.com/open-mrp/dfm-mcp/internal/constants"
+	"github.com/open-mrp/dfm-mcp/internal/crashreports"
 	"github.com/open-mrp/dfm-mcp/internal/localstore"
 	"github.com/open-mrp/dfm-mcp/internal/resource"
 	"github.com/open-mrp/dfm-mcp/telemetry"
@@ -115,6 +116,11 @@ func (a *API) ReportFeedback(ctx context.Context, in FeedbackInput, designID str
 		return nil, err
 	}
 	return &out, nil
+}
+
+// UploadCrashReport sends one crash the user agreed to report, keyed by its crash id so a retry files it once. Like telemetry, it needs no API key.
+func (a *API) UploadCrashReport(ctx context.Context, r crashreports.Report) error {
+	return a.Client.DoIdempotent(ctx, http.MethodPost, "/v1/dfm/crash-reports", nil, r, nil, "crash-report:"+r.CrashID)
 }
 
 // UploadTelemetry sends one batch of counts with the batch's own Idempotency-Key, so a batch retried after a lost response is counted once. It needs no API key: the report carries a random installation id and no account.

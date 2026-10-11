@@ -13,6 +13,8 @@ const (
 	CounterFeedback = "feedback"
 	// CounterErrors is checks the engine refused (a malformed file, a bad request).
 	CounterErrors = "errors"
+	// CounterCrashes is requests and background tasks that panicked: faults in the program, not in the drawing.
+	CounterCrashes = "crashes"
 	// Per-value counters are a prefix and one of the engine's enum values, such as verdict:manufacturable or format:dxf.
 	PrefixVerdict = "verdict:"
 	PrefixFormat  = "format:"
@@ -22,7 +24,7 @@ const (
 // Allowed reports whether a counter name is one the service accepts.
 func Allowed(name string) bool {
 	switch name {
-	case CounterChecks, CounterChecksRecorded, CounterFeedback, CounterErrors:
+	case CounterChecks, CounterChecksRecorded, CounterFeedback, CounterErrors, CounterCrashes:
 		return true
 	}
 	for _, prefix := range []string{PrefixVerdict, PrefixFormat, PrefixProcess} {

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,10 +44,8 @@ func init() {
 type Options struct {
 	// Local (required) is the engine, the store and the API behind the tools.
 	Local *Local
-	// Logger (optional; default: discards) gets the stack of a recovered crash.
-	Logger *slog.Logger
-	// CrashDir (optional; default: none) keeps a report of each recovered crash for the user to read or file.
-	CrashDir string
+	// Crashes (optional; default: recovers and counts, keeps and sends nothing) handles a request that panics.
+	Crashes *Crashes
 }
 
 const instructions = `DFM (design for manufacturing) checks for sheet-metal drawings: DXF, SVG and STEP. The engine answers "can this part be made on this machine from this stock", listing every problem by part with where it is and how to fix it.
@@ -78,11 +75,14 @@ func New(opts Options) *mcp.Server {
 	addFeedbackTool(s, opts.Local)
 	addResources(s, opts.Local)
 	addPrompts(s)
-	logger := opts.Logger
-	if logger == nil {
-		logger = slog.New(slog.DiscardHandler)
+	crashes := opts.Crashes
+	if crashes == nil {
+		crashes = &Crashes{}
 	}
-	s.AddReceivingMiddleware(recoverPanics(opts.Local, logger, opts.CrashDir))
+	if crashes.Counters == nil && opts.Local != nil {
+		crashes.Counters = opts.Local.Counters
+	}
+	s.AddReceivingMiddleware(crashes.middleware())
 	return s
 }
 

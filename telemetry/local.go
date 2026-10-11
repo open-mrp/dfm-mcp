@@ -64,6 +64,11 @@ type Permanent interface {
 	Permanent() bool
 }
 
+// Rejected is implemented by an upload error that refused the report only for counters the service does not know, as a service older than this program refuses a counter added since. RejectedCounters names them, and is empty when anything else was wrong.
+type Rejected interface {
+	RejectedCounters() []string
+}
+
 // batch is counts waiting to be sent, with the key their upload carries.
 type batch struct {
 	Key       string           `json:"key"`
@@ -249,6 +254,9 @@ func (c *Counters) Flush(ctx context.Context, up Uploader) {
 	case err == nil:
 		c.uploadErr = nil
 		c.st.Inflight = nil
+	case errors.As(err, &permanent) && permanent.Permanent() && c.withoutRejected(b, err):
+		// The rest of the batch goes at the next flush, under a new key: the service keeps its answer to the old one.
+		c.uploadErr = fmt.Errorf("the service does not take some counters yet; the rest of the report will be sent without them: %w", err)
 	case errors.As(err, &permanent) && permanent.Permanent():
 		c.uploadErr = fmt.Errorf("the service refused a report, which was dropped: %w", err)
 		c.st.Inflight = nil
@@ -256,6 +264,28 @@ func (c *Counters) Flush(ctx context.Context, up Uploader) {
 		c.uploadErr = err
 	}
 	_ = c.save()
+}
+
+// withoutRejected takes out of b the counters err says the service does not know, and gives it a new key. It reports false, leaving b as it was, when err is about something else or nothing would be left to send. Called with c.mu held.
+func (c *Counters) withoutRejected(b *batch, err error) bool {
+	var rejected Rejected
+	if !errors.As(err, &rejected) {
+		return false
+	}
+	names := rejected.RejectedCounters()
+	if len(names) == 0 || len(names) >= len(b.Counters) {
+		return false
+	}
+	for _, name := range names {
+		if _, ok := b.Counters[name]; !ok {
+			return false
+		}
+	}
+	for _, name := range names {
+		delete(b.Counters, name)
+	}
+	b.Key = newKey()
+	return true
 }
 
 // Run flushes every FlushInterval until ctx ends, and once more as it ends, so the last minute's counts are not lost when the server stops.

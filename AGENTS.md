@@ -13,14 +13,14 @@ make run    # serve over stdio against a service on localhost:8080
 ## Layout
 
 - `cmd/dfm-mcp` is the binary: `Run` serves MCP, and the `telemetry` subcommand shows or changes the upload mode.
-- `internal/mcpserver` is the server: tools, resources and prompt (`server.go`), the engine, store and counters behind them (`local.go`), and the little of the service it calls (`api.go`: record, feedback, fetch a check, mint a key, upload telemetry).
-- `internal/localstore` keeps results on the machine. `telemetry` (public, imported by the service for its allowlist) counts and uploads. `internal/client` is the HTTP client and the API version it speaks.
+- `internal/mcpserver` is the server: tools, resources and prompt (`server.go`), the engine, store and counters behind them (`local.go`), and the little of the service it calls (`api.go`: record, feedback, fetch a check, mint a key, upload telemetry and crash reports).
+- `internal/localstore` keeps results on the machine. `internal/crashreports` is the crash-report setting and the report the service takes. `telemetry` (public, imported by the service for its allowlist) counts and uploads. `internal/client` is the HTTP client and the API version it speaks.
 - `internal/resource` and `internal/constants` are the service's wire shapes, copied from it: the service's OpenAPI spec is the contract, and these must match it. `internal/engine` assembles the engine's check-request document and runs it; `internal/apierrors` maps engine errors onto the service's error codes so the agent sees one shape either way.
 
 ## Rules
 
 - Hand-written, never generated, never hosted: tools are shaped for tasks, not endpoints; every tool returns a text summary and structured content; errors come back as `isError` results in the service's error shape.
-- Nothing leaves the machine without the user's consent: `record`, `share_design` (asked through elicitation when the client supports it), `telemetry on`. A drawing is sent only with a feedback report the user chose to share it with.
+- Nothing leaves the machine without the user's consent: `record`, `share_design` (asked through elicitation when the client supports it), `telemetry on`, `crash-reports on`. A crash is recovered (`mcpserver.Crashes`: request middleware, and `Guard` for every background goroutine), counted and saved locally; it is sent only with `crash-reports on`, and a crash report never carries a call's arguments or a path. A drawing is sent only with a feedback report the user chose to share it with.
 - A new telemetry counter goes into `telemetry.Allowed` and the README's "What leaves the machine, and when" list together, and never carries a value from a drawing. The service refuses any other name. The same section is the user's only description of telemetry, so a change to what a report carries (its fields, its cadence) changes it too.
 - The service's routes this module calls are a published contract: a change there is a new API version, and this client pins the version it speaks in `internal/client`.
 - Comments: one paragraph per line, no hard wrapping; explain intent and side effects, not mechanics. Conventional Commits; release-please versions from them and goreleaser attaches the binaries.
