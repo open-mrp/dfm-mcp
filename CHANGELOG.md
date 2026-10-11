@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/open-mrp/dfm-mcp/compare/v1.0.1...v1.1.0) (2026-10-11)
+
+
+### Features
+
+* install script and Homebrew cask ([#4](https://github.com/open-mrp/dfm-mcp/issues/4)) ([1477f3a](https://github.com/open-mrp/dfm-mcp/commit/1477f3a388a1dbbfe610adf56c8e8e3ed64abd89))
+
 ## [1.0.1](https://github.com/open-mrp/dfm-mcp/compare/v1.0.0...v1.0.1) (2026-10-10)
 
 
