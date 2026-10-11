@@ -40,13 +40,20 @@ The catalogs are also resources (`dfm://finding-codes`, `dfm://capability-preset
 
 Results stay in `~/.local/state/dfm/checks`. Nothing reaches the service until the user records a check or reports a wrong result; a report records the check first and files the feedback against it. The API key for that is minted the first time it is needed and saved to `~/.config/dfm/credentials.json`, or taken from `DFM_API_KEY`. `DFM_API_URL` points the server at another deployment.
 
-If the server crashes on a request, it answers that request with an error instead of stopping, and keeps a report in `~/.local/state/dfm/crashes`: the version, the tool, the panic and the stack, never the call's arguments. The error carries a link to a GitHub issue prefilled with that report; it is filed only if the user opens the link and submits it. The crash is counted under `errors`.
+If the server crashes, on a request or in a background task, it fails only that request or task instead of stopping, and keeps a report in `~/.local/state/dfm/crashes` (the newest 20). A crash report carries:
+
+- a random crash id, made for that crash;
+- the operation that crashed (the tool, such as `dfm_check_design`, or a background task), the panic's message and the stack as function and file names, without directories;
+- this program's version, the engine version, the operating system, the architecture and the MCP client, as for telemetry;
+- when it happened.
+
+Never the call's arguments, an installation id or a drawing; a panic's message is the program's own, though it can quote a value the program was handling. Crash reports are sent to the service only after `dfm-mcp crash-reports on`, as each crash happens; `dfm-mcp crash-reports` shows the choice, and `crash-reports off` or `DO_NOT_TRACK=1` keeps them on the machine. Otherwise a crashed tool call carries a link to a GitHub issue prefilled with the report, filed only if the user opens it and submits it. Either way the crash is counted under `crashes`.
 
 When the server does call the service, the service logs the request's metadata (route, status, key id, client address and user agent) for usage reports, never a body and never a drawing.
 
 Usage is counted locally and sent only after `dfm-mcp telemetry on`. Once on, the server sends what it counted about once a minute while it is in use, and once more when it stops. Each report carries:
 
-- the counters, from a fixed list the service enforces: `checks`, `checks_recorded`, `feedback`, `errors`, and `verdict:`, `format:` and `process:` followed by one of the engine's values;
+- the counters, from a fixed list the service enforces: `checks`, `checks_recorded`, `feedback`, `errors`, `crashes`, and `verdict:`, `format:` and `process:` followed by one of the engine's values;
 - a random installation id, made on this machine and tied to no account, API key, user or machine name (`dfm-mcp telemetry reset-id` replaces it);
 - the MCP client the server is working for, as that client names itself (such as `claude-code`), and this program's version, the engine version, the operating system and the architecture;
 - the period the counts cover.

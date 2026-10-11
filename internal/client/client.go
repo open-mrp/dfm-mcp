@@ -69,6 +69,31 @@ func (e *Error) Permanent() bool {
 	return e.Status >= 400 && e.Status < 500 && e.Status != http.StatusRequestTimeout && e.Status != http.StatusTooManyRequests
 }
 
+// RejectedCounters names the telemetry counters a refused report was refused for, when they are all that was wrong with it, so the rest of the report can still be sent to a service that does not know a counter yet.
+func (e *Error) RejectedCounters() []string {
+	if e.Status != http.StatusUnprocessableEntity || len(e.Errors) == 0 {
+		return nil
+	}
+	var fields []struct {
+		Param *string `json:"param"`
+	}
+	if json.Unmarshal(e.Errors, &fields) != nil || len(fields) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f.Param == nil {
+			return nil
+		}
+		name, ok := strings.CutPrefix(*f.Param, "counters.")
+		if !ok || name == "" {
+			return nil
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
 // Do sends one request and decodes the response into out (a pointer), or returns the API's error.
 func (c *Client) Do(ctx context.Context, method, path string, query url.Values, body any, out any) error {
 	return c.DoIdempotent(ctx, method, path, query, body, out, "")

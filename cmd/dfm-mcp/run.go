@@ -20,6 +20,7 @@ import (
 	"github.com/open-mrp/dfm"
 
 	"github.com/open-mrp/dfm-mcp/internal/client"
+	"github.com/open-mrp/dfm-mcp/internal/crashreports"
 	"github.com/open-mrp/dfm-mcp/internal/localstore"
 	"github.com/open-mrp/dfm-mcp/internal/mcpserver"
 	"github.com/open-mrp/dfm-mcp/telemetry"
@@ -34,8 +35,10 @@ const usage = `dfm-mcp: the DFM check engine as an MCP server, over stdio, on th
   dfm-mcp telemetry on|local|off   send counts about once a minute while in use | count locally only (default) | count nothing
   dfm-mcp telemetry reset-id       replace the random installation id sent with counts
   dfm-mcp telemetry clear          forget this week's counts and anything waiting to be sent
+  dfm-mcp crash-reports            show whether crash reports are sent
+  dfm-mcp crash-reports on|off     send a report to the maintainers when dfm-mcp crashes | keep crashes on this machine only (default)
 
-Drawings never leave this machine unless the user shares one with a feedback report. Telemetry sends only the counts listed in the README, and only with "telemetry on"; DO_NOT_TRACK=1 turns it off.
+Drawings never leave this machine unless the user shares one with a feedback report. Telemetry sends only the counts listed in the README, and only with "telemetry on"; crash reports carry the version, where it failed, the panic and the stack, and are sent only with "crash-reports on". DO_NOT_TRACK=1 turns both off.
 `
 
 // Run is the entry point, separate from main so a test can drive it.
@@ -57,12 +60,22 @@ func Run(ctx context.Context, args []string, getenv func(string) string, _ io.Re
 		return err
 	}
 
+	crashSetting := crashreports.Open(paths.config, getenv)
+
 	if fs.NArg() > 0 {
-		if fs.Arg(0) != "telemetry" {
+		switch fs.Arg(0) {
+		case "telemetry":
+			return runTelemetry(fs.Args()[1:], counters, stdout)
+		case "crash-reports":
+			out, err := crashSetting.Command(fs.Args()[1:])
+			if out != "" {
+				fmt.Fprintln(stdout, out)
+			}
+			return err
+		default:
 			fmt.Fprint(stderr, usage)
 			return fmt.Errorf("unknown command %q", fs.Arg(0))
 		}
-		return runTelemetry(fs.Args()[1:], counters, stdout)
 	}
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
@@ -76,15 +89,16 @@ func Run(ctx context.Context, args []string, getenv func(string) string, _ io.Re
 	}
 	api := newAPI(*apiURL, paths.credentials, getenv, logger)
 	local := &mcpserver.Local{Store: store, API: api, Counters: counters}
+	crashes := &mcpserver.Crashes{Logger: logger, Dir: filepath.Join(paths.state, "crashes"), Counters: counters, Setting: crashSetting, API: api}
 
 	// With uploading on, counts go out about once a minute while the server runs, and once more as it stops.
 	flushed := make(chan struct{})
 	flushCtx, stopFlush := context.WithCancel(context.WithoutCancel(ctx))
 	go func() {
 		defer close(flushed)
-		counters.Run(flushCtx, api)
+		crashes.Guard("telemetry upload", func() { counters.Run(flushCtx, api) })
 	}()
-	err = mcpserver.New(mcpserver.Options{Local: local, Logger: logger, CrashDir: filepath.Join(paths.state, "crashes")}).Run(ctx, &mcp.StdioTransport{})
+	err = mcpserver.New(mcpserver.Options{Local: local, Crashes: crashes}).Run(ctx, &mcp.StdioTransport{})
 	stopFlush()
 	<-flushed
 	return err

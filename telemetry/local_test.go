@@ -179,3 +179,66 @@ func TestResetInstallationID(t *testing.T) {
 		t.Errorf("reset = %q, %v", second, err)
 	}
 }
+
+// rejectedCounters is the service refusing a report only for counters it does not know.
+type rejectedCounters []string
+
+func (r rejectedCounters) Error() string              { return "unknown counters" }
+func (rejectedCounters) Permanent() bool              { return true }
+func (r rejectedCounters) RejectedCounters() []string { return r }
+
+// A service older than this program refuses a counter added since; the rest of the batch still goes, under a new key, and a batch with nothing else in it is dropped.
+func TestSendsTheRestWhenACounterIsRefused(t *testing.T) {
+	c := open(t, nil)
+	if err := c.SetMode(ModeOn); err != nil {
+		t.Fatal(err)
+	}
+	c.Inc(CounterChecks, CounterCrashes)
+	up := &fakeUploader{err: rejectedCounters{CounterCrashes}}
+	c.Flush(context.Background(), up)
+	up.err = nil
+	c.Flush(context.Background(), up)
+	if len(up.sent) != 1 {
+		t.Fatalf("sent = %+v", up.sent)
+	}
+	if got := up.sent[0].report.Counters; len(got) != 1 || got[CounterChecks] != 1 {
+		t.Errorf("counters sent = %v", got)
+	}
+
+	c.Inc(CounterCrashes)
+	up.err = rejectedCounters{CounterCrashes}
+	c.Flush(context.Background(), up)
+	up.err = nil
+	c.Flush(context.Background(), up)
+	if len(up.sent) != 1 {
+		t.Errorf("a batch of only refused counters was sent again: %+v", up.sent)
+	}
+}
+
+// The first key the refused batch carried is not reused: the service keeps its answer to it.
+func TestRefusedCountersGetANewKey(t *testing.T) {
+	c := open(t, nil)
+	if err := c.SetMode(ModeOn); err != nil {
+		t.Fatal(err)
+	}
+	c.Inc(CounterChecks, CounterCrashes)
+	var keys []string
+	up := uploaderFunc(func(_ Report, key string) error {
+		keys = append(keys, key)
+		if len(keys) == 1 {
+			return rejectedCounters{CounterCrashes}
+		}
+		return nil
+	})
+	c.Flush(context.Background(), up)
+	c.Flush(context.Background(), up)
+	if len(keys) != 2 || keys[0] == keys[1] {
+		t.Errorf("keys = %v", keys)
+	}
+}
+
+type uploaderFunc func(Report, string) error
+
+func (f uploaderFunc) UploadTelemetry(_ context.Context, r Report, key string) error {
+	return f(r, key)
+}

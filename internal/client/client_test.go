@@ -48,3 +48,24 @@ func TestRetriesTransientFailuresWithOneKey(t *testing.T) {
 		t.Fatalf("error = %v, want the doc_url in it", err)
 	}
 }
+
+// A report refused only for counters names them, so the rest can be sent; any other refusal names none.
+func TestRejectedCounters(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		errors string
+		want   string
+	}{
+		{422, `[{"param":"counters.crashes","code":"invalid_format","message":"x"}]`, "crashes"},
+		{422, `[{"param":"counters.crashes","code":"invalid_format","message":"x"},{"param":"counters.new","code":"invalid_format","message":"x"}]`, "crashes,new"},
+		{422, `[{"param":"counters.crashes","code":"invalid_format","message":"x"},{"param":"period_ended_at","code":"invalid_format","message":"x"}]`, ""},
+		{422, `[{"param":null,"code":"invalid_format","message":"x"}]`, ""},
+		{422, `[]`, ""},
+		{400, `[{"param":"counters.crashes","code":"invalid_format","message":"x"}]`, ""},
+	} {
+		e := &Error{Status: tc.status, Errors: []byte(tc.errors)}
+		if got := strings.Join(e.RejectedCounters(), ","); got != tc.want {
+			t.Errorf("%d %s: got %q, want %q", tc.status, tc.errors, got, tc.want)
+		}
+	}
+}
