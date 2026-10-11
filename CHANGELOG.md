@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/open-mrp/dfm-mcp/compare/v1.1.1...v1.2.0) (2026-10-11)
+
+
+### Features
+
+* crash reports, a crashes counter and recovery in background tasks ([#10](https://github.com/open-mrp/dfm-mcp/issues/10)) ([b45b692](https://github.com/open-mrp/dfm-mcp/commit/b45b6929d637c71426615f2e8b4d4801f6efd204))
+* recover from crashes and let the user report them ([#9](https://github.com/open-mrp/dfm-mcp/issues/9)) ([bc3e1eb](https://github.com/open-mrp/dfm-mcp/commit/bc3e1eb4b3791e2b747379fe9d99c8b46f3d5ca0))
+
+
+### Bug Fixes
+
+* return the engine's design errors instead of crashing ([#8](https://github.com/open-mrp/dfm-mcp/issues/8)) ([3260f67](https://github.com/open-mrp/dfm-mcp/commit/3260f67b7661d164ec86622a27a7627b55901c5f))
+
 ## [1.1.1](https://github.com/open-mrp/dfm-mcp/compare/v1.1.0...v1.1.1) (2026-10-11)
 
 
