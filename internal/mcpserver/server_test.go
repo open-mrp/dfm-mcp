@@ -347,6 +347,10 @@ func TestWithTheAPI(t *testing.T) {
 	asked := 0
 	s := connect(t, local, &mcp.ClientOptions{
 		ElicitationHandler: func(_ context.Context, req *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+			if strings.Contains(req.Params.Message, "counts how it is used") {
+				// The usage-counts question, asked once on the second check; covered by TestTelemetryIsAskedOnce.
+				return &mcp.ElicitResult{Action: "accept", Content: map[string]any{"telemetry": "local"}}, nil
+			}
 			asked++
 			if !strings.Contains(req.Params.Message, "keep this drawing") {
 				t.Errorf("elicitation message: %s", req.Params.Message)
@@ -443,5 +447,106 @@ func TestEngineDesignErrorsAreResults(t *testing.T) {
 	res := call(t, s, "dfm_check_design", map[string]any{"file_path": path, "material_code": "mild_steel", "thickness": "1.5", "capability_preset": "fiber-3kw-3015"})
 	if !res.IsError || !strings.Contains(text(res), "design_") {
 		t.Errorf("an unreadable drawing: error=%v %s", res.IsError, text(res))
+	}
+}
+
+// The user is asked about usage counts once, on the check after one has worked, and the answer sticks; the asking check still runs once.
+func TestTelemetryIsAskedOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer *mcp.ElicitResult
+		want   telemetry.Mode
+	}{
+		{"accepted", &mcp.ElicitResult{Action: "accept", Content: map[string]any{"telemetry": "on"}}, telemetry.ModeOn},
+		{"declined", &mcp.ElicitResult{Action: "decline"}, telemetry.ModeLocal},
+		{"dismissed", &mcp.ElicitResult{Action: "cancel"}, telemetry.ModeLocal},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			local := newLocal(t, nil)
+			asked := 0
+			s := connect(t, local, &mcp.ClientOptions{
+				ElicitationHandler: func(_ context.Context, req *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+					asked++
+					if !strings.Contains(req.Params.Message, "never a drawing") {
+						t.Errorf("elicitation message: %s", req.Params.Message)
+					}
+					return tc.answer, nil
+				},
+			})
+			args := map[string]any{"file_path": fixturePath(t), "material_code": "mild_steel", "thickness": "1.5", "capability_preset": "fiber-3kw-3015"}
+			for i := range 3 {
+				if res := call(t, s, "dfm_check_design", args); res.IsError || strings.Contains(text(res), "Note for the user") {
+					t.Fatalf("check %d: error=%v %s", i, res.IsError, text(res))
+				}
+				if want := min(i, 1); asked != want {
+					t.Fatalf("after check %d asked=%d, want %d", i, asked, want)
+				}
+			}
+			if local.Counters.Mode() != tc.want || !local.Counters.Asked() {
+				t.Errorf("mode=%s asked=%v, want %s and asked", local.Counters.Mode(), local.Counters.Asked(), tc.want)
+			}
+			if n := local.Counters.Snapshot()[telemetry.CounterChecks]; n != 3 {
+				t.Errorf("checks counted = %d, want 3: the asking check runs once", n)
+			}
+		})
+	}
+}
+
+// A client that cannot ask the user gets a note in the first check result instead, once.
+func TestTelemetryNoteWithoutElicitation(t *testing.T) {
+	local := newLocal(t, nil)
+	s := connect(t, local, nil)
+	args := map[string]any{"file_path": fixturePath(t), "material_code": "mild_steel", "thickness": "1.5", "capability_preset": "fiber-3kw-3015"}
+	if res := call(t, s, "dfm_check_design", args); !strings.Contains(text(res), "dfm-mcp telemetry on") {
+		t.Errorf("first check should carry the note: %s", text(res))
+	}
+	if res := call(t, s, "dfm_check_design", args); strings.Contains(text(res), "Note for the user") {
+		t.Errorf("the note is shown once: %s", text(res))
+	}
+	if local.Counters.Mode() != telemetry.ModeLocal {
+		t.Errorf("the note must not change the mode: %s", local.Counters.Mode())
+	}
+}
+
+// A user who already chose, or set DO_NOT_TRACK, is never asked or told.
+func TestTelemetryNotRaisedAfterAChoice(t *testing.T) {
+	for name, setup := range map[string]func(t *testing.T) *Local{
+		"chose on the command line": func(t *testing.T) *Local {
+			local := newLocal(t, nil)
+			if err := local.Counters.SetMode(telemetry.ModeLocal); err != nil {
+				t.Fatal(err)
+			}
+			return local
+		},
+		"DO_NOT_TRACK": func(t *testing.T) *Local {
+			local := newLocal(t, nil)
+			counters, err := telemetry.Open(t.TempDir(), t.TempDir(), "dfm-mcp", "test", "0", func(k string) string {
+				if k == "DO_NOT_TRACK" {
+					return "1"
+				}
+				return ""
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			local.Counters = counters
+			return local
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			local := setup(t)
+			for _, opts := range []*mcp.ClientOptions{nil, {ElicitationHandler: func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+				t.Error("must not ask")
+				return &mcp.ElicitResult{Action: "decline"}, nil
+			}}} {
+				s := connect(t, local, opts)
+				args := map[string]any{"file_path": fixturePath(t), "material_code": "mild_steel", "thickness": "1.5", "capability_preset": "fiber-3kw-3015"}
+				for range 2 {
+					if res := call(t, s, "dfm_check_design", args); strings.Contains(text(res), "Note for the user") {
+						t.Errorf("must not tell: %s", text(res))
+					}
+				}
+			}
+		})
 	}
 }

@@ -242,3 +242,25 @@ type uploaderFunc func(Report, string) error
 func (f uploaderFunc) UploadTelemetry(_ context.Context, r Report, key string) error {
 	return f(r, key)
 }
+
+// Asked is false only until the user chooses a mode or is asked; DO_NOT_TRACK counts as a choice.
+func TestAsked(t *testing.T) {
+	c := open(t, nil)
+	if c.Asked() {
+		t.Fatal("a new installation has not been asked")
+	}
+	if err := c.MarkAsked(); err != nil || !c.Asked() || c.Mode() != ModeLocal {
+		t.Errorf("after MarkAsked: err=%v asked=%v mode=%s", err, c.Asked(), c.Mode())
+	}
+	chose := open(t, nil)
+	if err := chose.SetMode(ModeOff); err != nil || !chose.Asked() {
+		t.Errorf("a chosen mode counts as asked: err=%v", err)
+	}
+	if !open(t, map[string]string{"DO_NOT_TRACK": "1"}).Asked() {
+		t.Error("DO_NOT_TRACK counts as asked")
+	}
+	var none *Counters
+	if !none.Asked() {
+		t.Error("no counters is never asked")
+	}
+}
