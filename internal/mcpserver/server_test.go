@@ -18,7 +18,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/open-mrp/dfm-mcp/internal/app"
 	"github.com/open-mrp/dfm-mcp/internal/client"
 	"github.com/open-mrp/dfm-mcp/internal/localstore"
 	"github.com/open-mrp/dfm-mcp/telemetry"
@@ -109,7 +108,6 @@ func mustJSON(t *testing.T, v any) []byte {
 
 // Everything but recording and feedback works with no server at all: the engine, the catalogs, the resources and the prompt are in the binary.
 func TestWorksWithoutAServer(t *testing.T) {
-	app.Register()
 	local := newLocal(t, nil)
 	s := connect(t, local, nil)
 
@@ -331,7 +329,6 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestWithTheAPI(t *testing.T) {
-	app.Register()
 	ctx := context.Background()
 	fake := &fakeAPI{t: t, checks: map[string]map[string]any{}, designs: map[string]map[string]any{}}
 	server := httptest.NewServer(http.HandlerFunc(fake.serve))
@@ -433,5 +430,18 @@ func TestWithTheAPI(t *testing.T) {
 	report.Counters["drawing_name"] = 1
 	if err := (&API{Client: &client.Client{BaseURL: server.URL}}).UploadTelemetry(ctx, report, ""); err == nil || !strings.Contains(err.Error(), "counters.drawing_name") {
 		t.Errorf("bad counter: %v", err)
+	}
+}
+
+// A drawing the engine rejects comes back as an isError result carrying the engine's code, with nothing registered by the test: the binary registers nothing either, and an unregistered code used to panic and take the server down.
+func TestEngineDesignErrorsAreResults(t *testing.T) {
+	s := connect(t, newLocal(t, nil), nil)
+	path := filepath.Join(t.TempDir(), "broken.dxf")
+	if err := os.WriteFile(path, []byte("this is not a drawing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res := call(t, s, "dfm_check_design", map[string]any{"file_path": path, "material_code": "mild_steel", "thickness": "1.5", "capability_preset": "fiber-3kw-3015"})
+	if !res.IsError || !strings.Contains(text(res), "design_") {
+		t.Errorf("an unreadable drawing: error=%v %s", res.IsError, text(res))
 	}
 }
