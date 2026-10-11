@@ -7,10 +7,12 @@ The drawing never leaves the machine. The server reaches the DFM service only wh
 ## Install
 
 ```sh
-go install github.com/open-mrp/dfm-mcp/cmd/dfm-mcp@latest
+brew install open-mrp/tap/dfm-mcp                                               # Homebrew, macOS or Linux
+curl -fsSL https://raw.githubusercontent.com/open-mrp/dfm-mcp/main/install.sh | sh   # macOS or Linux, into ~/.local/bin
+go install github.com/open-mrp/dfm-mcp/cmd/dfm-mcp@latest                       # from source
 ```
 
-Or take a binary from the [releases](https://github.com/open-mrp/dfm-mcp/releases/latest). Then add it to your client:
+The script downloads the release for your machine and checks it against the release's checksums; `DFM_MCP_VERSION=v1.2.3` pins a release and `DFM_MCP_INSTALL_DIR` picks the directory. On Windows, take a binary from the [releases](https://github.com/open-mrp/dfm-mcp/releases/latest). Then add it to your client:
 
 ```json
 { "mcpServers": { "dfm": { "command": "dfm-mcp" } } }

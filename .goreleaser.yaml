@@ -20,6 +20,38 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 checksum:
   name_template: checksums.txt
+# Publishes a cask to the open-mrp/homebrew-tap repository, so `brew install open-mrp/tap/dfm-mcp` installs the release. It pushes over SSH with a deploy key that can write to the tap and nothing else, and is skipped until the HOMEBREW_TAP_DEPLOY_KEY secret holds that key.
+homebrew_casks:
+  - name: dfm-mcp
+    repository:
+      owner: open-mrp
+      name: homebrew-tap
+      git:
+        url: git@github.com:open-mrp/homebrew-tap.git
+        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
+    directory: Casks
+    homepage: https://github.com/open-mrp/dfm-mcp
+    description: The DFM check engine as a local MCP server
+    license: Apache-2.0
+    commit_msg_template: "dfm-mcp {{ .Tag }}"
+    # Homebrew prints these after the install: how to add the server to each client. GoReleaser writes the caveats into the cask as Ruby strings, one per line, and Homebrew shows only the last, so this is folded into one line: each \n is a Ruby newline, and quotes are escaped for Ruby.
+    caveats: >-
+      Add dfm-mcp to your MCP client:
+      \n
+      \n  Claude Code   claude mcp add --scope user dfm -- dfm-mcp
+      \n  Codex         codex mcp add dfm -- dfm-mcp
+      \n  Cursor        add to ~/.cursor/mcp.json:
+      \n                  { \"mcpServers\": { \"dfm\": { \"command\": \"dfm-mcp\" } } }
+      \n  opencode      add to ~/.config/opencode/opencode.json:
+      \n                  { \"mcp\": { \"dfm\": { \"type\": \"local\", \"command\": [\"dfm-mcp\"] } } }
+    skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_DEPLOY_KEY" }}false{{ else }}true{{ end }}'
+    # The binary is not notarized, so Gatekeeper would refuse to run it once Homebrew has quarantined the download.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dfm-mcp"]
+          end
 release:
   # release-please makes the release; goreleaser only attaches the archives.
   mode: keep-existing
