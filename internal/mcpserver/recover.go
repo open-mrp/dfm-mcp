@@ -46,7 +46,7 @@ func recoverPanics(local *Local, logger *slog.Logger, crashDir string) mcp.Middl
 					result, err = &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: c.message(saved)}}}, nil
 					return
 				}
-				result, err = nil, fmt.Errorf("dfm-mcp crashed handling %s (crash %s); the server is still running", method, c.id)
+				result, err = nil, fmt.Errorf("dfm-mcp crashed handling %s (crash %s)", method, c.id)
 			}()
 			return next(ctx, method, req)
 		}
@@ -130,11 +130,11 @@ func firstLine(s string, max int) string {
 	return s
 }
 
-// message is the failed tool call: what happened, that the server is still up, and how to report it.
+// message is the failed tool call: what happened and how to report it.
 func (c crash) message(saved string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "dfm-mcp hit a bug and could not finish %s (500 internal_error, crash %s): %s.\n\n", c.where(), c.id, firstLine(c.panic, 300))
-	b.WriteString("This is a fault in dfm-mcp, not a finding about the drawing, and retrying the same call will most likely fail again. The server is still running; other calls work.\n\n")
+	b.WriteString("This is a fault in dfm-mcp, not a finding about the drawing, and retrying the same call will most likely fail again.\n\n")
 	if saved != "" {
 		fmt.Fprintf(&b, "The full crash report is at %s.\n", saved)
 	}

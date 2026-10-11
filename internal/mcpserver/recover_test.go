@@ -37,7 +37,7 @@ func TestCrashIsRecovered(t *testing.T) {
 
 	res := call(t, session, "boom", map[string]any{"path": "/Users/someone/secret-part.step"})
 	msg := text(res)
-	if !res.IsError || !strings.Contains(msg, "internal_error") || !strings.Contains(msg, "index out of range") || !strings.Contains(msg, "still running") {
+	if !res.IsError || !strings.Contains(msg, "internal_error") || !strings.Contains(msg, "index out of range") || !strings.Contains(msg, "not a finding") {
 		t.Fatalf("crash result: error=%v %s", res.IsError, msg)
 	}
 	i := strings.Index(msg, issuesURL+"?")
